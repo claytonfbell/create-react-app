@@ -17,6 +17,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CaseSensitivePathsPlugin = require('case-sensitive-paths-webpack-plugin');
 const InlineChunkHtmlPlugin = require('react-dev-utils/InlineChunkHtmlPlugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const { SWCMinifyPlugin } = require('swc-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const safePostCssParser = require('postcss-safe-parser');
@@ -39,6 +40,13 @@ const postcssNormalize = require('postcss-normalize');
 
 const appPackageJson = require(paths.appPackageJson);
 
+// to measure build times
+const SpeedMeasurePlugin = require("speed-measure-webpack-plugin");
+const smp = new SpeedMeasurePlugin({
+    outputFormat: "human",
+});
+
+
 // Source maps are resource heavy and can cause out of memory issue for large source files.
 const shouldUseSourceMap = process.env.GENERATE_SOURCEMAP !== 'false';
 // Some apps do not need the benefits of saving a web request, so not inlining the chunk
@@ -53,6 +61,12 @@ const imageInlineSizeLimit = parseInt(
 
 // Check if TypeScript is setup
 const useTypeScript = fs.existsSync(paths.appTsConfig);
+
+// Check if SWC is setup
+const useSWC = fs.existsSync(paths.swcrc);
+const useSWCMinify = fs.existsSync(paths.swcrcMinify);
+console.log(useSWC ? "swc-loader" : "babel-loader");
+console.log(useSWCMinify ? "SWCMinifyPlugin" : "TerserPlugin");
 
 // style files regexes
 const cssRegex = /\.css$/;
@@ -138,7 +152,7 @@ module.exports = function(webpackEnv) {
     return loaders;
   };
 
-  return {
+  return smp.wrap({
     mode: isEnvProduction ? 'production' : isEnvDevelopment && 'development',
     // Stop compilation early in production
     bail: isEnvProduction,
@@ -207,6 +221,7 @@ module.exports = function(webpackEnv) {
       minimize: isEnvProduction,
       minimizer: [
         // This is only used in production mode
+        useSWCMinify ? new SWCMinifyPlugin({ sourceMaps: shouldUseSourceMap, configFile: paths.swcrcMinify }) :
         new TerserPlugin({
           terserOptions: {
             parse: {
@@ -377,20 +392,25 @@ module.exports = function(webpackEnv) {
                 name: 'static/media/[name].[hash:8].[ext]',
               },
             },
+            // raw-loader for markdown content
+            {
+              test: [/\.md$/],
+              loader: require.resolve('raw-loader'),
+            },
             // Process application JS with Babel.
             // The preset includes JSX, Flow, TypeScript, and some ESnext features.
             {
-              test: /\.(js|mjs|jsx|ts|tsx)$/,
-              include: paths.appSrc,
+              test: useSWC ? /\.disabledbabel$/ : /\.(js|mjs|jsx|ts|tsx)$/,
+              include: paths.transpileInclude,
               loader: require.resolve('babel-loader'),
               options: {
                 customize: require.resolve(
                   'babel-preset-react-app/webpack-overrides'
                 ),
+                presets: [require.resolve('babel-preset-react-app')],
                 // @remove-on-eject-begin
                 babelrc: false,
                 configFile: false,
-                presets: [require.resolve('babel-preset-react-app')],
                 // Make sure we have a unique cache identifier, erring on the
                 // side of caution.
                 // We remove this when the user ejects because the default
@@ -433,7 +453,7 @@ module.exports = function(webpackEnv) {
             // Process any JS outside of the app with Babel.
             // Unlike the application JS, we only compile the standard ES features.
             {
-              test: /\.(js|mjs)$/,
+              test: useSWC ? /\.disabledbabel$/ : /\.(js|mjs)$/,
               exclude: /@babel(?:\/|\\{1,2})runtime/,
               loader: require.resolve('babel-loader'),
               options: {
@@ -469,6 +489,19 @@ module.exports = function(webpackEnv) {
                 inputSourceMap: shouldUseSourceMap,
               },
             },
+
+            // SWC REPLACES BABEL
+            {
+                test: !useSWC ? /\.disabledswc$/ : /\.(js|mjs|jsx|ts|tsx)$/,
+                include: paths.transpileInclude,
+                loader: require.resolve('swc-loader'),
+            },
+            {
+                test: !useSWC ? /\.disabledswc$/ : /\.(js|mjs)$/,
+                loader: require.resolve('swc-loader'),
+            },
+
+
             // "postcss" loader applies autoprefixer to our CSS.
             // "css" loader resolves paths in CSS and adds assets as dependencies.
             // "style" loader turns CSS into JS modules that inject <style> tags.
@@ -715,5 +748,5 @@ module.exports = function(webpackEnv) {
     // Turn off performance processing because we utilize
     // our own hints via the FileSizeReporter
     performance: false,
-  };
+  });
 };

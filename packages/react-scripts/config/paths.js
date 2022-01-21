@@ -56,6 +56,12 @@ const resolveModule = (resolveFn, filePath) => {
   return resolveFn(`${filePath}.js`);
 };
 
+// allow transpiling outside of our project root like node_modules that alias to locations outside of project folder
+let transpileInclude = resolveApp("src");
+if (fs.existsSync(resolveApp("transpile-include.json"))) {
+  transpileInclude = require(resolveApp("transpile-include.json")).include.map(path => resolveApp(path));
+}
+
 // config after eject: we're in ./config/
 module.exports = {
   dotenv: resolveApp('.env'),
@@ -66,6 +72,9 @@ module.exports = {
   appIndexJs: resolveModule(resolveApp, 'src/index'),
   appPackageJson: resolveApp('package.json'),
   appSrc: resolveApp('src'),
+  transpileInclude,
+  swcrc: resolveApp('.swcrc'),
+  swcrcMinify: resolveApp('.swcrc-minify'),
   appTsConfig: resolveApp('tsconfig.json'),
   appJsConfig: resolveApp('jsconfig.json'),
   yarnLockFile: resolveApp('yarn.lock'),
@@ -88,6 +97,9 @@ module.exports = {
   appIndexJs: resolveModule(resolveApp, 'src/index'),
   appPackageJson: resolveApp('package.json'),
   appSrc: resolveApp('src'),
+  transpileInclude,
+  swcrc: resolveApp('.swcrc'),
+  swcrcMinify: resolveApp('.swcrc-minify'),
   appTsConfig: resolveApp('tsconfig.json'),
   appJsConfig: resolveApp('jsconfig.json'),
   yarnLockFile: resolveApp('yarn.lock'),

@@ -14,6 +14,11 @@ declare module '*.bmp' {
   export default src;
 }
 
+declare module '*.md' {
+  const content: string;
+  export default content;
+}
+
 declare module '*.gif' {
   const src: string;
   export default src;
