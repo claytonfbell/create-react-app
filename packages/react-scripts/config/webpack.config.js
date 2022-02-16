@@ -152,7 +152,7 @@ module.exports = function(webpackEnv) {
     return loaders;
   };
 
-  return smp.wrap({
+  const config = {
     mode: isEnvProduction ? 'production' : isEnvDevelopment && 'development',
     // Stop compilation early in production
     bail: isEnvProduction,
@@ -748,5 +748,10 @@ module.exports = function(webpackEnv) {
     // Turn off performance processing because we utilize
     // our own hints via the FileSizeReporter
     performance: false,
-  });
+  };
+  if (isEnvProduction) {
+      return smp.wrap(config);
+  } else {
+      return config;
+  }
 };
